@@ -7,9 +7,12 @@ set sample_size=(select 50000+(ABS(RANDOM()) % 100000));
 create table if not exists CONSORTIUM_SHARING.MOBILE.CUSTOMER as (select * from SNOWFLAKE_SAMPLE_DATA.TPCDS_SF100TCL.CUSTOMER sample ($sample_size rows));
 grant ownership on table CONSORTIUM_SHARING.MOBILE.CUSTOMER to role SYSADMIN;
 
--- create a secure view for this table in order to share it outbound.
-create secure view if not exists CONSORTIUM_SHARING.MOBILE.CUSTOMER_OUTBOUND_VIEW as
-(select current_account() as SNOWFLAKE_ID,* from CONSORTIUM_SHARING.MOBILE.CUSTOMER);
+-- can't use current_account() in the view definition, as it will be evaluated by the accounts it's shared to
+-- need a stored proc to create the view so that it contains a string literal
+create or replace secure view CONSORTIUM_SHARING.MOBILE.CUSTOMER_OUTBOUND_VIEW as (select 'II42339' as SNOWFLAKE_ID,* from CONSORTIUM_SHARING.MOBILE.CUSTOMER);
+--create or replace secure view CONSORTIUM_SHARING.MOBILE.CUSTOMER_OUTBOUND_VIEW as (select 'LY01550' as SNOWFLAKE_ID,* from CONSORTIUM_SHARING.MOBILE.CUSTOMER);
+--create or replace secure view CONSORTIUM_SHARING.MOBILE.CUSTOMER_OUTBOUND_VIEW as (select 'JTEST2' as SNOWFLAKE_ID,* from CONSORTIUM_SHARING.MOBILE.CUSTOMER);
+--create or replace secure view CONSORTIUM_SHARING.MOBILE.CUSTOMER_OUTBOUND_VIEW as (select 'JTEST3' as SNOWFLAKE_ID,* from CONSORTIUM_SHARING.MOBILE.CUSTOMER);
 
 -- add the view to the share
 grant select on view CONSORTIUM_SHARING.MOBILE.CUSTOMER_OUTBOUND_VIEW to share MOBILE_CONSORTIUM_SHARE;
