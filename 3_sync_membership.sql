@@ -1,38 +1,54 @@
 -- consortium membership changes (new or departing member)
 
 -- populate a list of consortium members and their snowflake accounts
-create or replace table CONSORTIUM_SHARING.MOBILE.CONSORTIUM_MEMBERS (SNOWFLAKE_ID,COMPANY_NAME) as 
-select * from ( values
-('II42339', 'Silver Mobile'), 
-('LY01550', 'Network fuse'), 
-('JTEST2', 'Houndphone'), 
-('JTEST3', 'Venus Networks')
+create or replace table CONSORTIUM_SHARING.MOBILE.CONSORTIUM_MEMBERS (SNOWFLAKE_ID varchar(8),COMPANY_NAME varchar(100),CONTRIBUTOR boolean, VIEWER boolean) as 
+select * from (values
+('II42339', 'Silver Mobile',true,true), 
+('LY01550', 'Network fuse',true,true), 
+('JTEST2', 'Houndphone',true,true), 
+('JTEST3', 'Venus Networks',true,true)
 );
 
--- Need to be able to run the statement for all account except for this one
-alter share MOBILE_CONSORTIUM_SHARE add accounts=II42339;
-alter share MOBILE_CONSORTIUM_SHARE add accounts=LY01550;
-alter share MOBILE_CONSORTIUM_SHARE add accounts=JTEST2;
-alter share MOBILE_CONSORTIUM_SHARE add accounts=JTEST3;
+-- if this account is a contributor, update the outbound share to include all viewers
 
--- Need to be able to run the statement for all account except for this one
-create or replace database "CONSORTIUM_SHARING.INBOUND.JTEST2" from share JTEST2.MOBILE_CONSORTIUM_SHARE;
-create or replace database "CONSORTIUM_SHARING.INBOUND.JTEST3" from share JTEST3.MOBILE_CONSORTIUM_SHARE;
-create or replace database "CONSORTIUM_SHARING.INBOUND.II42339" from share II42339.MOBILE_CONSORTIUM_SHARE;
-create or replace database "CONSORTIUM_SHARING.INBOUND.LY01550" from share LY01550.MOBILE_CONSORTIUM_SHARE;
+-- returns true when finished
+create or replace procedure CONSORTIUM_SHARING.MOBILE.UPDATE_MEMBERSHIP()
+  returns boolean
+  language javascript
+  as
+  $$
+  var results = snowflake.execute({
+    sqlText: "select count(*) from CONSORTIUM_SHARING.MOBILE.CONSORTIUM_MEMBERS where SNOWFLAKE_ID=current_account() and CONTRIBUTOR=true;"
+  });
+  results.next();
+  var am_i_a_contributor=results.getColumnValue(1) > 0
+  
+  results = snowflake.execute({
+    sqlText: "select count(*) from CONSORTIUM_SHARING.MOBILE.CONSORTIUM_MEMBERS where SNOWFLAKE_ID=current_account() and VIEWER=true;"
+  });
+  results.next();
+  var am_i_a_viewer=results.getColumnValue(1) > 0
+  
+  if (am_i_a_contributor){
+    results = snowflake.execute({
+      sqlText: "select listagg(SNOWFLAKE_ID,',') FROM CONSORTIUM_SHARING.MOBILE.CONSORTIUM_MEMBERS WHERE SNOWFLAKE_ID!=current_account() and VIEWER=true;"
+    });
+    results.next();
+    var other_viewers=results.getColumnValue(1);
+    snowflake.execute({
+      sqlText: "alter share MOBILE_CONSORTIUM_SHARE set accounts="+other_viewers
+    });
+  }
+  if (am_i_a_viewer){
+    // TODO: for each contributor other than this account:
+    // create database if not exists "CONSORTIUM_SHARING.INBOUND.(account)" from share (account).MOBILE_CONSORTIUM_SHARE;
+    // create a view that unions the inbound table from all other contributors, plus this account's table too if we're a contributor
+  }
+  
+  return true;
+  $$
+  ;
+USE DATABASE CONSORTIUM_SHARING;
+USE SCHEMA MOBILE;
 
--- this view will look different for each account, as its own data comes from the local table and the rest from the inbound shares
--- another candidate for generating via stored proc
-create or replace view CONSORTIUM_SHARING.MOBILE.CUSTOMER_COMBINED as(
-select * from "CONSORTIUM_SHARING"."MOBILE"."CUSTOMER_OUTBOUND_VIEW"
-union
-select * from "CONSORTIUM_SHARING.INBOUND.JTEST2"."MOBILE"."CUSTOMER_OUTBOUND_VIEW"
-union
-select * from "CONSORTIUM_SHARING.INBOUND.JTEST3"."MOBILE"."CUSTOMER_OUTBOUND_VIEW"
-union
-select * from "CONSORTIUM_SHARING.INBOUND.LY01550"."MOBILE"."CUSTOMER_OUTBOUND_VIEW"
-)
-
--- should display all accounts in the consortium, with customer counts next to them (between 50k and 150k records each)
-select SNOWFLAKE_ID,count(*) from CONSORTIUM_SHARING.MOBILE.CUSTOMER_COMBINED
-GROUP BY SNOWFLAKE_ID
+call UPDATE_MEMBERSHIP()

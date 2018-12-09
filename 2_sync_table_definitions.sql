@@ -7,12 +7,21 @@ set sample_size=(select 50000+(ABS(RANDOM()) % 100000));
 create table if not exists CONSORTIUM_SHARING.MOBILE.CUSTOMER as (select * from SNOWFLAKE_SAMPLE_DATA.TPCDS_SF100TCL.CUSTOMER sample ($sample_size rows));
 grant ownership on table CONSORTIUM_SHARING.MOBILE.CUSTOMER to role SYSADMIN;
 
--- can't use current_account() in the view definition, as it will be evaluated by the accounts it's shared to
--- need a stored proc to create the view so that it contains a string literal
-create or replace secure view CONSORTIUM_SHARING.MOBILE.CUSTOMER_OUTBOUND_VIEW as (select 'II42339' as SNOWFLAKE_ID,* from CONSORTIUM_SHARING.MOBILE.CUSTOMER);
---create or replace secure view CONSORTIUM_SHARING.MOBILE.CUSTOMER_OUTBOUND_VIEW as (select 'LY01550' as SNOWFLAKE_ID,* from CONSORTIUM_SHARING.MOBILE.CUSTOMER);
---create or replace secure view CONSORTIUM_SHARING.MOBILE.CUSTOMER_OUTBOUND_VIEW as (select 'JTEST2' as SNOWFLAKE_ID,* from CONSORTIUM_SHARING.MOBILE.CUSTOMER);
---create or replace secure view CONSORTIUM_SHARING.MOBILE.CUSTOMER_OUTBOUND_VIEW as (select 'JTEST3' as SNOWFLAKE_ID,* from CONSORTIUM_SHARING.MOBILE.CUSTOMER);
+-- create a secure view for this table in order to share it outbound
+-- uses a stored procedure in order to resolve and hard code the account number into the view, so that it works when used in other accounts
+-- couldn't get the parameter binding to work so had to use concatenation
+create or replace procedure CONSORTIUM_SHARING.MOBILE.CREATE_OUTBOUND_VIEW(account string)
+  returns string not null
+  language javascript
+  as
+  $$
+  var account1 = ACCOUNT
+  return snowflake.execute({
+    sqlText: "create or replace secure view CONSORTIUM_SHARING.MOBILE.CUSTOMER_OUTBOUND_VIEW as (select '"+account1+"' as SNOWFLAKE_ID, * from CONSORTIUM_SHARING.MOBILE.CUSTOMER);"
+  });
+  $$
+  ;
+call CREATE_OUTBOUND_VIEW(current_account())
 
 -- add the view to the share
 grant select on view CONSORTIUM_SHARING.MOBILE.CUSTOMER_OUTBOUND_VIEW to share MOBILE_CONSORTIUM_SHARE;
