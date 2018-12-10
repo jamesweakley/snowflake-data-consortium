@@ -1,5 +1,5 @@
 # snowflake-data-consortium
-This repository serves as a pattern for managing a peer to peer data sharing consortium within [Snowflake](www.snowflake.net).
+This repository serves as a pattern for managing a peer to peer data sharing consortium within [Snowflake](https://www.snowflake.net).
 
 In this scenario, several parties all hold their own portion of the same dataset, that could potentially be combined into a shared view.
 
@@ -48,7 +48,11 @@ It creates a table to track membership, and a great big stored procedure to map 
 
 ## Opportunities for improvement
 
-Currently, if a consortium member violently revoked access to their shares, it would break the combined view for every other member:
+### Simpler sharing/view management
+The stored proc is really a workaround that creates a sharing group and a merged view. Ideally these are concepts that could be built into Snowflake to simplify management.
+
+### Prevent accidental/deliberate view breakage
+Currently if a consortium member violently revoked access to their shares, it would break the combined view for every other member:
 ```SQL compilation error: Shared database is no longer available for use. It will need to be re-created if and when the publisher makes it available again.```
 
 
