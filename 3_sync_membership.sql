@@ -4,7 +4,7 @@
 create or replace table CONSORTIUM_SHARING.MOBILE.CONSORTIUM_MEMBERS (SNOWFLAKE_ID varchar(8),COMPANY_NAME varchar(100),CONTRIBUTOR boolean, VIEWER boolean) as 
 select * from (values
 ('II42339', 'Silver Mobile',true,true), 
-('LY01550', 'Network fuse',true,true), 
+('LY01234', 'Network fuse',true,true), 
 ('JTEST2', 'Houndphone',true,true), 
 ('JTEST3', 'Venus Networks',true,true)
 );
